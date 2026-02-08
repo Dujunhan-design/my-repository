@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>幸运转盘抽奖</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft Yahei", sans-serif;
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        /* 转盘容器 */
+        .wheel-container {
+            position: relative;
+            width: 85vw;
+            max-width: 400px;
+            height: 85vw;
+            max-height: 400px;
+            margin-bottom: 30px;
+        }
+
+        /* 转盘样式 - 使用conic-gradient实现等分扇形 */
+        .wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            position: relative;
+            overflow: hidden;
+            border: 8px solid #ff6b81;
+            transition: transform 5s cubic-bezier(0.2, 0.8, 0.2, 1);
+            /* 7个等分扇形，每个约51.428度 */
+            background: conic-gradient(
+                #ff6b81 0deg 51.428deg,
+                #ff8c69 51.428deg 102.856deg,
+                #ffd166 102.856deg 154.284deg,
+                #06d6a0 154.284deg 205.712deg,
+                #118ab2 205.712deg 257.14deg,
+                #073b4c 257.14deg 308.568deg,
+                #764ba2 308.568deg 360deg
+            );
+        }
+
+        /* 扇区文字容器 - 精确定位在每个扇区的中间 */
+        .wheel-segment {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 50%;
+            height: 40px;
+            margin-top: -20px;
+            transform-origin: left center;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding-left: 70px;
+            pointer-events: none;
+        }
+
+        /* 扇区文字样式 */
+        .segment-text {
+            color: #fff;
+            font-size: 16px;
+            font-weight: 600;
+            white-space: nowrap;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+            transform: rotate(90deg);
+        }
+
+        /* 指针样式 - 固定在顶部 */
+        .pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-bottom: 30px solid #ffd166;
+            z-index: 10;
+            pointer-events: none;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        }
+
+        /* 中心圆装饰 */
+        .wheel-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 60px;
+            height: 60px;
+            background: #fff;
+            border-radius: 50%;
+            border: 4px solid #ff6b81;
+            z-index: 5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #ff6b81;
+            font-size: 14px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+
+        /* 按钮样式 */
+        .btn {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 50px;
+            background: #ff6b81;
+            color: #fff;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        .btn:hover {
+            background: #ff4757;
+            transform: scale(1.05);
+            box-shadow: 0 6px 16px rgba(0,0,0,0.3);
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* 奖品图片展示区 */
+        .prize-images {
+            display: none;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 15px;
+            margin: 20px 0;
+            width: 90vw;
+            max-width: 500px;
+        }
+
+        .prize-image {
+            width: 100px;
+            height: 100px;
+            border-radius: 8px;
+            object-fit: cover;
+            border: 3px solid transparent;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: #fff;
+        }
+
+        .prize-image:hover {
+            transform: scale(1.1);
+            border-color: #ffd166;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+
+        /* 自定义输入区样式 */
+        .custom-input-area {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+            margin: 20px 0;
+            width: 90vw;
+            max-width: 500px;
+        }
+
+        .custom-input {
+            width: 100%;
+            padding: 12px 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .confirm-btn {
+            padding: 10px 25px;
+        }
+
+        /* 提示文本 */
+        .tips {
+            color: #fff;
+            font-size: 18px;
+            margin: 15px 0;
+            text-align: center;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+
+        /* 通用弹窗样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 100;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: #fff;
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            max-width: 90%;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .modal-title {
+            font-size: 20px;
+            color: #ff6b81;
+            margin-bottom: 20px;
+        }
+
+        /* 商品链接弹窗样式 */
+        .link-modal-text {
+            font-size: 16px;
+            margin-bottom: 20px;
+            word-break: break-all;
+            color: #333;
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 8px;
+            font-family: monospace;
+        }
+
+        /* 操作按钮组 */
+        .modal-btn-group {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+
+        /* 确认选择按钮特殊样式 */
+        .confirm-choice-btn {
+            background: #06d6a0;
+        }
+
+        .confirm-choice-btn:hover {
+            background: #05b88b;
+        }
+    </style>
+</head>
+<body>
+    <div class="tips" id="main-tips">点击下方按钮开始抽奖</div>
+    
+    <!-- 转盘区域 -->
+    <div class="wheel-container">
+        <div class="pointer"></div>
+        <div class="wheel" id="wheel">
+            <!-- 文字将通过JS动态添加 -->
+        </div>
+        <div class="wheel-center">抽奖</div>
+    </div>
+
+    <!-- 开始按钮 -->
+    <button class="btn" id="start-btn">开始抽奖</button>
+
+    <!-- 奖品图片展示区 -->
+    <div class="prize-images" id="prize-images"></div>
+
+    <!-- 自定义输入区 -->
+    <div class="custom-input-area" id="custom-input-area">
+        <input type="text" class="custom-input" id="custom-text-input" placeholder="请输入你想要的文字（最多20个字）" maxlength="20">
+        <button class="btn confirm-btn" id="confirm-custom-btn">确认输入</button>
+    </div>
+
+    <!-- 商品链接弹窗 -->
+    <div class="modal" id="link-modal">
+        <div class="modal-content">
+            <h3 class="modal-title">商品链接</h3>
+            <p class="link-modal-text" id="link-text">加载中...</p>
+            <button class="btn" id="close-link-btn">返回</button>
+        </div>
+    </div>
+
+    <!-- 选择确认弹窗 -->
+    <div class="modal" id="choice-modal">
+        <div class="modal-content">
+            <h3 class="modal-title">确认你的选择</h3>
+            <div class="modal-btn-group">
+                <button class="btn confirm-choice-btn" id="confirm-choice-btn">确认选择</button>
+                <button class="btn" id="restart-choice-btn">再选一次</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 兑奖提示弹窗 -->
+    <div class="modal" id="reward-modal">
+        <div class="modal-content">
+            <h3 class="modal-title">兑奖提示</h3>
+            <p class="link-modal-text">请记住你刚刚选择的奖品并找包包大人兑奖！</p>
+            <button class="btn" id="close-reward-btn">我知道了</button>
+        </div>
+    </div>
+
+    <!-- 自定义确认弹窗 -->
+    <div class="modal" id="custom-modal">
+        <div class="modal-content">
+            <h3 class="modal-title" id="custom-modal-title"></h3>
+            <div class="modal-btn-group">
+                <button class="btn confirm-choice-btn" id="confirm-custom-choice-btn">确认选择</button>
+                <button class="btn" id="restart-custom-btn">再选一次</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 奖品列表（7个奖品，索引0-6）
+        const prizes = [
+            { 
+                name: "睡衣", 
+                images: [
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/Panda.jpg",
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/Bear.jpg",
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/Cold.jpg"
+                ],
+                links: [
+                    "https://3.cn/2DPrPq-3?jkl=@WF2Ix65W0Ai@",
+                    "https://e.tb.cn/h.7F1fPEX0xb9EjO9?tk=gP7gUPdnwf3",
+                    "https://3.cn/2DP-kx9S?jkl=@FC2Se9BXPlX@"
+                ]
+            },
+            { 
+                name: "保温杯", 
+                images: [
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/Mountain.jpg",
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/JianBianLan.jpg",
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/HighBlack.jpg"
+                ],
+                links: [
+                    "https://3.cn/2DP-kx9S?jkl=@FC2Se9BXPlX@",
+                    "https://3.cn/2DPv-PFW?jkl=@QCf6aF7tatv@",
+                    "https://3.cn/2DPvC-Qm?jkl=@QEFPy8FOuyv@"
+                ]
+            },
+            { 
+                name: "鞋子", 
+                images: [
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/ZhuoMuNiao.jpg",
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/QingLanSe.jpg",
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/ChinaRed.jpg"
+                ],
+                links: [
+                    "https://3.cn/2DPy-0jI?jkl=@K88WA1KJVsB@",
+                    "https://3.cn/2DP-yGf5?jkl=@H3SpnFUVSBl@",
+                    "https://3.cn/2DP-yGf5?jkl=@H3SpnFUVSBl@"
+                ]
+            },
+            { 
+                name: "皮带", 
+                images: [
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/DaoCaoRen.jpg",
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/QiPiLang.jpg",
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/HaiLanZhiJia.jpg"
+                ],
+                links: [
+                    "https://3.cn/2D-PAH49?jkl=@H308rBPosOo@",
+                    "https://3.cn/2-DPAPdM?jkl=@LCher03pl2K@",
+                    "https://3.cn/2D-PB2Cp?jkl=@P0B3i89g0on@"
+                ]
+            },
+            { 
+                name: "剃须刀", 
+                images: [
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/BianXieFangKuai.jpg",
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/BoRui.jpg",
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/AoKeSi.jpg"
+                ],
+                links: [
+                    "https://3.cn/-2DPKbpB?jkl=@XCzgG3CRjpr@",
+                    "https://3.cn/2DPJY4-x?jkl=@GAp6aCYtetd@",
+                    "https://3.cn/2DPB-FQR?jkl=@JFhag4Pw8i2@"
+                ]
+            },
+            {   
+                name: "磁轴键盘", 
+                images: [
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/RogYemo.jpg",
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/LeiSheHeiGuaFu.jpg",
+                    "https://raw.githubusercontent.com/Dujunhan-design/my-repository/main/images/MoZhuaT68.jpg"
+                ],
+                links: [
+                    "https://3.cn/2-DPNpb4?jkl=@U7Y2C7g10LS@",
+                    "https://3.cn/2DPMsG-i?jkl=@FDMRw4qfH4V@",
+                    "https://3.cn/2DPLI-eR?jkl=@DFyGx0eafdG@"
+                ]
+            },
+            { name: "自定义", isCustom: true }
+        ];
+
+        // DOM 元素
+        const wheel = document.getElementById('wheel');
+        const startBtn = document.getElementById('start-btn');
+        const prizeImages = document.getElementById('prize-images');
+        const customInputArea = document.getElementById('custom-input-area');
+        const customTextInput = document.getElementById('custom-text-input');
+        const confirmCustomBtn = document.getElementById('confirm-custom-btn');
+        const mainTips = document.getElementById('main-tips');
+        
+        // 弹窗元素
+        const linkModal = document.getElementById('link-modal');
+        const linkText = document.getElementById('link-text');
+        const closeLinkBtn = document.getElementById('close-link-btn');
+        const choiceModal = document.getElementById('choice-modal');
+        const confirmChoiceBtn = document.getElementById('confirm-choice-btn');
+        const restartChoiceBtn = document.getElementById('restart-choice-btn');
+        const rewardModal = document.getElementById('reward-modal');
+        const closeRewardBtn = document.getElementById('close-reward-btn');
+        const customModal = document.getElementById('custom-modal');
+        const customModalTitle = document.getElementById('custom-modal-title');
+        const confirmCustomChoiceBtn = document.getElementById('confirm-custom-choice-btn');
+        const restartCustomBtn = document.getElementById('restart-custom-btn');
+
+        // 全局变量
+        let currentPrize = null;
+        let currentImageIndex = -1;
+        let currentCustomText = '';
+        let currentRotation = 0;
+
+        // 初始化转盘文字
+        function initWheel() {
+            wheel.innerHTML = '';
+            const segmentAngle = 360 / prizes.length; // 51.428度
+            
+            prizes.forEach((prize, index) => {
+                const segment = document.createElement('div');
+                segment.className = 'wheel-segment';
+                
+                // 文字角度 = 索引 * 扇形角度 + 半扇形角度
+                // 这样文字位于每个扇形的正中间
+                const angle = index * segmentAngle + segmentAngle / 2;
+                segment.style.transform = `rotate(${angle}deg)`;
+                
+                const textEl = document.createElement('div');
+                textEl.className = 'segment-text';
+                textEl.textContent = prize.name;
+                
+                segment.appendChild(textEl);
+                wheel.appendChild(segment);
+            });
+        }
+
+        // 旋转转盘
+        function spinWheel() {
+            startBtn.disabled = true;
+            mainTips.textContent = '转盘旋转中...';
+            
+            // 隐藏所有展示区域和弹窗
+            prizeImages.style.display = 'none';
+            customInputArea.style.display = 'none';
+            hideAllModals();
+            
+            const segmentAngle = 360 / prizes.length;
+            
+            // 随机选择中奖索引 (0-6)
+            const winningIndex = Math.floor(Math.random() * prizes.length);
+            
+            // 关键修复：计算旋转角度
+            // 指针固定在顶部（0度位置，12点钟方向）
+            // 转盘顺时针旋转
+            
+            // 当前扇区分布（conic-gradient顺时针）：
+            // 索引0(睡衣): 0-51.428度（顶部偏右）
+            // 索引1(保温杯): 51.428-102.856度
+            // 索引2(鞋子): 102.856-154.284度
+            // 索引3(皮带): 154.284-205.712度
+            // 索引4(剃须刀): 205.712-257.14度
+            // 索引5(磁轴键盘): 257.14-308.568度
+            // 索引6(自定义): 308.568-360度（顶部偏左）
+            
+            // 要让指针指向第winningIndex个扇区，
+            // 需要将该扇区的中间旋转到0度（顶部）
+            
+            const spins = 5 + Math.floor(Math.random() * 5); // 5-10圈
+            const baseRotation = spins * 360;
+            
+            // 扇区中间角度
+            const sectorMiddle = winningIndex * segmentAngle + segmentAngle / 2;
+            
+            // 关键：转盘顺时针旋转，所以要将sectorMiddle转到0度，
+            // 需要旋转 (360 - sectorMiddle) 度
+            // 这样 sectorMiddle + (360 - sectorMiddle) = 360 ≡ 0 (mod 360)
+            
+            const targetRotation = baseRotation + (360 - sectorMiddle);
+            
+            // 累加旋转角度
+            currentRotation += targetRotation;
+            
+            // 应用旋转
+            wheel.style.transform = `rotate(${currentRotation}deg)`;
+            
+            // 旋转结束后展示对应内容
+            setTimeout(() => {
+                currentPrize = prizes[winningIndex];
+                mainTips.textContent = `恭喜抽中：${currentPrize.name}`;
+                
+                if (currentPrize.isCustom) {
+                    showCustomInput();
+                } else {
+                    showPrizeImages(currentPrize);
+                }
+                
+                startBtn.disabled = false;
+            }, 5000);
+        }
+
+        // 展示奖品图片（固定3张）
+        function showPrizeImages(prize) {
+            prizeImages.innerHTML = '';
+            prizeImages.style.display = 'flex';
+            
+            // 只取前3张图片和对应链接
+            const displayImages = prize.images.slice(0, 3);
+            const displayLinks = prize.links.slice(0, 3);
+            
+            displayImages.forEach((imgSrc, index) => {
+                const img = document.createElement('img');
+                img.className = 'prize-image';
+                img.src = imgSrc;
+                img.alt = `${prize.name}${index + 1}`;
+                // 点击图片展示对应链接
+                img.onclick = () => showLinkModal(prize.name, index, displayLinks[index]);
+                prizeImages.appendChild(img);
+            });
+        }
+
+        // 展示商品链接弹窗
+        function showLinkModal(prizeName, imgIndex, link) {
+            currentImageIndex = imgIndex;
+            linkText.textContent = link;
+            linkModal.style.display = 'flex';
+        }
+
+        // 展示自定义输入框
+        function showCustomInput() {
+            customInputArea.style.display = 'flex';
+            customTextInput.value = '';
+            customTextInput.focus();
+        }
+
+        // 确认自定义输入
+        function confirmCustomInput() {
+            currentCustomText = customTextInput.value.trim();
+            
+            if (!currentCustomText) {
+                alert('请输入想要的文字后再确认！');
+                return;
+            }
+            
+            customModalTitle.textContent = `你自定义的文字是：「${currentCustomText}」`;
+            customModal.style.display = 'flex';
+            customInputArea.style.display = 'none';
+        }
+
+        // 隐藏所有弹窗
+        function hideAllModals() {
+            linkModal.style.display = 'none';
+            choiceModal.style.display = 'none';
+            rewardModal.style.display = 'none';
+            customModal.style.display = 'none';
+        }
+
+        // 回到初始状态
+        function resetToInitial() {
+            hideAllModals();
+            prizeImages.style.display = 'none';
+            customInputArea.style.display = 'none';
+            mainTips.textContent = '点击下方按钮开始抽奖';
+            currentPrize = null;
+            currentImageIndex = -1;
+            currentCustomText = '';
+        }
+
+        // 绑定事件
+        startBtn.addEventListener('click', spinWheel);
+        
+        closeLinkBtn.addEventListener('click', () => {
+            linkModal.style.display = 'none';
+            choiceModal.style.display = 'flex';
+        });
+        
+        confirmChoiceBtn.addEventListener('click', () => {
+            choiceModal.style.display = 'none';
+            rewardModal.style.display = 'flex';
+        });
+        
+        restartChoiceBtn.addEventListener('click', resetToInitial);
+        
+        closeRewardBtn.addEventListener('click', hideAllModals);
+        
+        confirmCustomBtn.addEventListener('click', confirmCustomInput);
+        
+        confirmCustomChoiceBtn.addEventListener('click', () => {
+            customModal.style.display = 'none';
+            rewardModal.style.display = 'flex';
+        });
+        
+        restartCustomBtn.addEventListener('click', resetToInitial);
+        
+        customTextInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                confirmCustomInput();
+            }
+        });
+
+        // 初始化
+        window.onload = initWheel;
+    </script>
+</body>
+</html>
